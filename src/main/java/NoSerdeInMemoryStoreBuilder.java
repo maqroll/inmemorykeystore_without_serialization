@@ -1,16 +1,20 @@
+import java.util.Comparator;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 
-public class NoSerdeInMemoryStoreBuilder<K, V> implements StoreBuilder<KeyValueStore<K, V>> {
+public class NoSerdeInMemoryStoreBuilder<K extends Comparable, V>
+    implements StoreBuilder<KeyValueStore<K, V>> {
 
   private final String name;
 
   private final Serde<K> serdeKey;
 
   private final Serde<V> serdeValue;
+
+  private final Comparator<K> keyComparator;
 
   public NoSerdeInMemoryStoreBuilder(String name, Serde<K> serdeKey, Serde<V> serdeValue) {
     Objects.requireNonNull(name);
@@ -19,6 +23,18 @@ public class NoSerdeInMemoryStoreBuilder<K, V> implements StoreBuilder<KeyValueS
     this.name = name;
     this.serdeKey = serdeKey;
     this.serdeValue = serdeValue;
+    this.keyComparator = Comparator.naturalOrder();
+  }
+
+  public NoSerdeInMemoryStoreBuilder(
+      String name, Serde<K> serdeKey, Serde<V> serdeValue, Comparator<K> keyComparator) {
+    Objects.requireNonNull(name);
+    Objects.requireNonNull(serdeKey);
+    Objects.requireNonNull(serdeValue);
+    this.name = name;
+    this.serdeKey = serdeKey;
+    this.serdeValue = serdeValue;
+    this.keyComparator = keyComparator;
   }
 
   @Override
@@ -43,7 +59,7 @@ public class NoSerdeInMemoryStoreBuilder<K, V> implements StoreBuilder<KeyValueS
 
   @Override
   public KeyValueStore<K, V> build() {
-    return new NoSerdeInMemoryKeyValueStore<K, V>(name, serdeKey, serdeValue);
+    return new NoSerdeInMemoryKeyValueStore<K, V>(name, serdeKey, serdeValue, keyComparator);
   }
 
   @Override

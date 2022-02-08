@@ -1,9 +1,11 @@
 import it.unimi.dsi.fastutil.objects.ObjectObjectImmutablePair;
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Objects;
+import java.util.TreeMap;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.processor.BatchingStateRestoreCallback;
@@ -15,7 +17,7 @@ import org.apache.kafka.streams.state.KeyValueStore;
 
 public class NoSerdeInMemoryKeyValueStore<K, V> implements KeyValueStore<K, V> {
 
-  private final Map<K, V> store = new HashMap<>();
+  private final NavigableMap<K, V> store;
 
   private final Serde<K> serdeKey;
 
@@ -23,7 +25,8 @@ public class NoSerdeInMemoryKeyValueStore<K, V> implements KeyValueStore<K, V> {
 
   private final String name;
 
-  public NoSerdeInMemoryKeyValueStore(String name, Serde<K> serdeKey, Serde<V> serdeValue) {
+  public NoSerdeInMemoryKeyValueStore(
+      String name, Serde<K> serdeKey, Serde<V> serdeValue, Comparator<K> comparator) {
     Objects.requireNonNull(name);
     Objects.requireNonNull(serdeKey);
     Objects.requireNonNull(serdeValue);
@@ -31,6 +34,7 @@ public class NoSerdeInMemoryKeyValueStore<K, V> implements KeyValueStore<K, V> {
     this.name = name;
     this.serdeKey = serdeKey;
     this.serdeValue = serdeValue;
+    this.store = new TreeMap<>(comparator);
   }
 
   @Override
@@ -117,7 +121,32 @@ public class NoSerdeInMemoryKeyValueStore<K, V> implements KeyValueStore<K, V> {
 
   @Override
   public KeyValueIterator<K, V> range(K from, K to) {
-    throw new UnsupportedOperationException();
+    NavigableMap<K, V> submap = store.subMap(from, true, to, false);
+    Iterator<K> it = submap.navigableKeySet().iterator();
+
+    return new KeyValueIterator<K, V>() {
+      @Override
+      public void close() {
+        // empty by design
+      }
+
+      @Override
+      public K peekNextKey() {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public boolean hasNext() {
+        return it.hasNext();
+      }
+
+      @Override
+      public KeyValue<K, V> next() {
+        K nextKey = it.next();
+        V val = submap.get(nextKey);
+        return KeyValue.pair(nextKey, val);
+      }
+    };
   }
 
   @Override
